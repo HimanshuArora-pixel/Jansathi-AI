@@ -163,6 +163,8 @@ export function ChatMessageList({
                           rehypePlugins={[rehypeRaw]}
                           components={{
                             // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            a: ({node, ...props}: any) => <a className="text-[var(--color-semantic-blue)] hover:underline hover:opacity-80 transition-all font-medium" target="_blank" rel="noopener noreferrer" {...props} />,
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
                             p: ({node, ...props}: any) => <motion.p initial={{opacity: 0, y: 10}} animate={{opacity: 1, y: 0}} transition={{duration: 0.4}} className="mb-4 last:mb-0" {...props} />,
                             // eslint-disable-next-line @typescript-eslint/no-explicit-any
                             h1: ({node, ...props}: any) => <motion.h1 initial={{opacity: 0, y: 10}} animate={{opacity: 1, y: 0}} transition={{duration: 0.4}} className="font-heading font-medium text-xl mt-6 mb-3" {...props} />,
