@@ -8,7 +8,7 @@ PERSIST_DIRECTORY = os.getenv("CHROMA_PERSIST_DIR", "./data/chroma_db")
 client = chromadb.PersistentClient(path=PERSIST_DIRECTORY, settings=Settings(anonymized_telemetry=False))
 
 # Use HuggingFace Serverless Inference API for embeddings to save RAM
-from langchain_huggingface import HuggingFaceInferenceAPIEmbeddings
+from langchain_community.embeddings import HuggingFaceInferenceAPIEmbeddings
 
 # Requires HF_TOKEN environment variable
 hf_token = os.getenv("HF_TOKEN")
