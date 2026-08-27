@@ -16,11 +16,7 @@ async def lifespan(app: FastAPI):
     # Startup: create db tables
     await init_db()
     
-    print("[DEBUG] DB initialized. Loading ML models...")
-    # Pre-load ML models (Embedding and Cross-Encoder) into memory
-    from rag.pipeline import get_rag_pipeline
-    get_rag_pipeline()
-    print("[DEBUG] ML Models loaded successfully! Yielding to Uvicorn...")
+    print("[DEBUG] DB initialized. External APIs will be used for AI inference. Yielding to Uvicorn...")
     
     yield
     print("[DEBUG] Shutdown initiated")

@@ -10,10 +10,6 @@ langchain-experimental
 langgraph
 chromadb
 rank-bm25
-sentence-transformers
-transformers
-torch>=2.0.0
-datasets
 networkx
 pydantic[email]
 pydantic-settings
@@ -27,6 +23,4 @@ passlib[bcrypt]
 bcrypt
 sqlalchemy
 aiosqlite
-scikit-learn
-safetensors
 python-docx

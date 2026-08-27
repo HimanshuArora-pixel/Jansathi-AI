@@ -7,17 +7,18 @@ from chromadb.config import Settings
 PERSIST_DIRECTORY = os.getenv("CHROMA_PERSIST_DIR", "./data/chroma_db")
 client = chromadb.PersistentClient(path=PERSIST_DIRECTORY, settings=Settings(anonymized_telemetry=False))
 
-# Use a fast local model for embeddings (disable on Render free tier to save RAM)
-is_render = os.getenv("RENDER") == "true"
+# Use HuggingFace Serverless Inference API for embeddings to save RAM
+from langchain_huggingface import HuggingFaceInferenceAPIEmbeddings
 
-if not is_render:
-    from langchain_huggingface import HuggingFaceEmbeddings
-    embedding_function = HuggingFaceEmbeddings(
-        model_name="BAAI/bge-small-en-v1.5",
-        model_kwargs={'device': 'cpu'},
-        encode_kwargs={'normalize_embeddings': True}
+# Requires HF_TOKEN environment variable
+hf_token = os.getenv("HF_TOKEN")
+if hf_token:
+    embedding_function = HuggingFaceInferenceAPIEmbeddings(
+        api_key=hf_token,
+        model_name="BAAI/bge-small-en-v1.5"
     )
 else:
+    print("Warning: HF_TOKEN not set. Vector search will be disabled.")
     embedding_function = None
 
 def get_collection(collection_name: str = "jansaathi_legal_kb"):

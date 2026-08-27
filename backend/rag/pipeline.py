@@ -11,24 +11,8 @@ class HybridRAGPipeline:
         self.collection_name = collection_name
         self.collection = get_collection(collection_name)
         
-        # Cross-Encoder for reranking (Wrap in try-except for offline/proxy resilience)
-        is_render = os.getenv("RENDER") == "true"
-        if is_render:
-            print("Running on Render (limited RAM). Local cross-encoder disabled.")
-            self.reranker = None
-        else:
-            try:
-                from sentence_transformers import CrossEncoder
-                # Try offline first
-                self.reranker = CrossEncoder('cross-encoder/ms-marco-MiniLM-L-12-v2', max_length=512, local_files_only=True)
-            except Exception:
-                try:
-                    # If not cached, try downloading normally
-                    print("Local cross-encoder not found. Attempting to download from Hugging Face...")
-                    self.reranker = CrossEncoder('cross-encoder/ms-marco-MiniLM-L-12-v2', max_length=512)
-                except Exception as e:
-                    print(f"WARNING: Could not load CrossEncoder due to network/proxy issues. Reranking is disabled. Error: {e}")
-                    self.reranker = None
+        # Reranker removed to save RAM
+        self.reranker = None
         
         # LLM for query expansion
         self.llm = ChatGroq(
@@ -116,23 +100,12 @@ class HybridRAGPipeline:
         return [doc_store[doc_id] for doc_id, score in sorted_docs]
 
     def _rerank(self, query: str, candidates: list[dict], top_n: int = 5) -> list[dict]:
-        """Use a local cross-encoder model to accurately rerank the merged candidates."""
+        """Reranking disabled. Returning un-reranked hybrid results."""
         if not candidates:
             return []
             
-        if self.reranker is None:
-            # Fallback if cross-encoder failed to load due to proxy/network issues
-            print("[RAG] Reranker disabled. Returning un-reranked hybrid results.")
-            return candidates[:top_n]
-            
-        pairs = [[query, doc["content"]] for doc in candidates]
-        scores = self.reranker.predict(pairs)
-        
-        # Attach scores and sort
-        for i, score in enumerate(scores):
-            candidates[i]["rerank_score"] = float(score)
-            
-        return sorted(candidates, key=lambda x: x["rerank_score"], reverse=True)[:top_n]
+        print("[RAG] Reranker disabled. Returning un-reranked hybrid results.")
+        return candidates[:top_n]
 
     def _expand_query(self, query: str) -> list[str]:
         """Uses LLM to generate alternative phrasing of the query with legal terminology."""
