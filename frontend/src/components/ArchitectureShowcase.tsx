@@ -71,11 +71,19 @@ export function ArchitectureShowcase() {
             {features.map((feature, idx) => {
               const isActive = idx === activeIndex;
               return (
-                <button
+                <div
                   key={feature.id}
+                  role="button"
+                  tabIndex={0}
                   onMouseEnter={() => setActiveIndex(idx)}
                   onClick={() => setActiveIndex(idx)}
-                  className={`relative flex items-center text-left p-5 rounded-xl transition-all duration-300 ${
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      setActiveIndex(idx);
+                      e.preventDefault();
+                    }
+                  }}
+                  className={`relative flex items-center text-left p-5 rounded-xl cursor-pointer transition-all duration-300 ${
                     isActive 
                       ? "bg-[var(--color-bg-surface)] shadow-lg ring-1 ring-[var(--color-border-accent)] ring-opacity-50" 
                       : "hover:bg-[var(--color-bg-subtle)]"
@@ -97,7 +105,7 @@ export function ArchitectureShowcase() {
                       transition={{ duration: 0.3 }}
                     />
                   )}
-                </button>
+                </div>
               );
             })}
           </div>

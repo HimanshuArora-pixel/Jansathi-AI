@@ -2,9 +2,26 @@
 
 import { useTheme } from "@/components/ThemeProvider";
 import { Moon, Sun } from "lucide-react";
+import { useState, useEffect } from "react";
 
 export function ThemeToggle({ className = "" }: { className?: string }) {
   const { theme, toggleTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return (
+      <button
+        className={`relative flex items-center justify-center p-2 rounded-full text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-elevated)] transition-colors ${className}`}
+        aria-label="Toggle theme placeholder"
+      >
+        <div className="w-[18px] h-[18px]" aria-hidden="true" />
+      </button>
+    );
+  }
 
   return (
     <button
