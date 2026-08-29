@@ -13,6 +13,12 @@ llm = ChatGroq(
     max_tokens=2048
 )
 
+try:
+    from utils.link_dictionary import VERIFIED_LINKS
+    _verified_names = ", ".join(list(VERIFIED_LINKS.keys()))
+except ImportError:
+    _verified_names = "e-Jagriti, National Consumer Helpline, NALSA, RTI Online"
+
 drafting_prompt = ChatPromptTemplate.from_messages([
     ("system", """You are JanSaathi — India's most capable AI legal assistant. You draft professional, legally-sound documents for Indian citizens.
 
@@ -25,7 +31,9 @@ drafting_prompt = ChatPromptTemplate.from_messages([
    - Include ALL standard clauses for that document type
    - Use placeholders [YOUR FULL NAME], [YOUR ADDRESS], [DATE], [DISTRICT], [STATE] where information is missing
 5. After the `</document>` tags, add a brief "📋 What To Do Next" section with specific steps (where to send it, fees, timeline)
-6. DO NOT INVENT URLS: Just state the name of the portal (e.g. "National Consumer Helpline", "e-Jagriti"). Do NOT output any raw URLs or HTTP links yourself. Our system will inject the correct links automatically.
+6. DO NOT INVENT URLS: Just state the name of the portal. Our system will automatically inject verified links if you mention the EXACT names of any of these organizations:
+   """ + _verified_names + """
+   Do NOT output any raw URLs or HTTP links yourself.
 
 CRITICAL RULE: Keep your response concise! Do NOT write more than 500 words outside of the document. Do not over-explain.
 
@@ -171,12 +179,14 @@ IMPORTANT INSTRUCTION ON FORMATTING:
 1. If the user is asking a BROAD initial question or asking for a general plan of action, you MAY use the following structured format:
    - **⚖️ Your Legal Rights** (Bullet points or table)
    - **🗺️ Your Action Roadmap** (Step-by-step)
-   - **📞 Key Contacts & Resources** (Use simple markdown links: [Name](https://url.com). NEVER use backticks or nested brackets in links).
+   - **📞 Key Contacts & Resources** (Just list the names of the organizations/portals. DO NOT generate markdown links or URLs, our system will inject them).
 2. HOWEVER, if the user is asking a SPECIFIC follow-up question (e.g. "how do I fix this?", "what is the penalty?", "can they do that?"), DO NOT use the massive structured format! Just answer their specific question naturally, conversationally, and concisely in a few paragraphs.
 3. NEVER hallucinate templates. If you tell the user to use a template, you MUST actually provide the text of the template or letter.
 4. If the user asks you to draft a letter, notice, or agreement, you MUST wrap the drafted text inside `<document>` and `</document>` tags so the system can process it.
 5. RULE 5: If the user is asking a general biographical or civic question about a politician (e.g. "who is narendra modi?"), DO NOT use the massive structured format. Provide a direct, conversational, and factual biography instead.
-6. DO NOT INVENT URLS: Just state the name of the portal (e.g. "National Consumer Helpline", "e-Jagriti"). Do NOT output any raw URLs or HTTP links yourself. Our system will inject the correct links automatically.
+6. DO NOT INVENT URLS: Just state the name of the portal. Our system will automatically inject verified links if you mention the EXACT names of any of these organizations:
+   """ + _verified_names + """
+   Do NOT output any raw URLs or HTTP links yourself.
 
 Rules:
 - NEVER say "I cannot provide advice" or "consult a lawyer" as your main answer — you ARE the advisor.
