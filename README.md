@@ -10,7 +10,7 @@
 [![InLegalBERT](https://img.shields.io/badge/Model-InLegalBERT--10Class-orange.svg?style=for-the-badge&logo=huggingface&logoColor=white)](https://huggingface.co/law-ai/InLegalBERT)
 [![LangGraph](https://img.shields.io/badge/Orchestration-LangGraph-purple.svg?style=for-the-badge)](https://langchain-ai.github.io/langgraph/)
 [![ChromaDB](https://img.shields.io/badge/VectorDB-ChromaDB-red.svg?style=for-the-badge)](https://www.trychroma.com/)
-[![Live Demo](https://img.shields.io/badge/Demo-Live%20App-success.svg?style=for-the-badge&logo=netlify&logoColor=white)](https://jansathi-ai.netlify.app/chat)
+[![Live Demo](https://img.shields.io/badge/Demo-Live%20App-success.svg?style=for-the-badge&logo=netlify&logoColor=white)](https://jansathi-ai.netlify.app)
 
 **Built for the Hackathon · Zero Hallucination Guarantee · Grounded in Real Indian Jurisprudence**
 
