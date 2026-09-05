@@ -40,15 +40,31 @@ _use_local_model = (not _is_render) and _model_file_ok
 # ---------------------------------------------------------------------------
 # 1. Load local fine-tuned model (only when appropriate)
 # ---------------------------------------------------------------------------
+DEFAULT_LABEL_MAPPING = {
+    0: "Cheque_Bounce",
+    1: "Civic_Scheme_Info",
+    2: "Consumer_Dispute",
+    3: "Criminal_FIR",
+    4: "Cybercrime",
+    5: "Legal_Notice_Contract",
+    6: "RERA_RealEstate",
+    7: "RTI",
+    8: "Tenant_Landlord",
+    9: "Workplace_Labour",
+}
+
 local_model = None
 local_tokenizer = None
-label_mapping: dict[int, str] = {}
+label_mapping: dict[int, str] = DEFAULT_LABEL_MAPPING.copy()
 
 # Always load the label mapping (used by both local model and Hugging Face API)
 if os.path.exists(MAPPING_FILE):
-    with open(MAPPING_FILE, "r", encoding="utf-8") as f:
-        raw = json.load(f)
-        label_mapping = {int(k): v for k, v in raw.items()}
+    try:
+        with open(MAPPING_FILE, "r", encoding="utf-8") as f:
+            raw = json.load(f)
+            label_mapping.update({int(k): v for k, v in raw.items()})
+    except Exception:
+        pass
 
 if _use_local_model:
     try:
@@ -61,15 +77,14 @@ if _use_local_model:
         local_model.eval()
         print(f"[IntentRouter] Local model loaded. Classes: {list(label_mapping.values())}")
     except Exception as exc:
-        print(f"[IntentRouter] Failed to load local model: {exc}. Falling back to Groq.")
+        print(f"[IntentRouter] Failed to load local model: {exc}. Falling back to Hugging Face / Groq.")
         local_model = None
         local_tokenizer = None
-        label_mapping = {}
 else:
     if _is_render:
-        print("[IntentRouter] Render environment detected. Skipping local model — using Groq.")
+        print("[IntentRouter] Render environment detected. Skipping local model — using Hugging Face / Groq.")
     else:
-        print("[IntentRouter] Local model not found or too small. Using Groq fallback.")
+        print("[IntentRouter] Local model not found or cloud mode active. Using Hugging Face / Groq fallback.")
 
 # ---------------------------------------------------------------------------
 # 2. Groq LLM fallback (always initialised)
