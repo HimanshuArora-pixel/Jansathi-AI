@@ -44,6 +44,7 @@ export default function RootLayout({
       </head>
       <body
         className={`${inter.variable} ${dmSans.variable} antialiased transition-colors duration-200`}
+        suppressHydrationWarning
       >
         <ThemeProvider>
           <AuthProvider>

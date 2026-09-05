@@ -84,4 +84,4 @@ Write-Host "========================================="
 
 # Launch both servers in separate windows
 Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd `"$baseDir\frontend`"; Write-Host 'Starting Frontend Server...' -ForegroundColor Cyan; npm run dev"
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd `"$baseDir\backend`"; Write-Host 'Starting Backend Server...' -ForegroundColor Cyan; .\.venv\Scripts\python.exe -m uvicorn main:app --reload"
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd `"$baseDir\backend`"; Write-Host 'Starting Backend Server...' -ForegroundColor Cyan; .\.venv\Scripts\python.exe -m uvicorn main:app --reload --reload-exclude `".venv`" --port 8000"

@@ -65,12 +65,22 @@ app = FastAPI(
 
 # CORS middleware
 import os
-origins_str = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000")
-origins = [o.strip() for o in origins_str.split(",") if o.strip()]
+origins_env = os.getenv("CORS_ORIGINS", "")
+configured_origins = [o.strip() for o in origins_env.split(",") if o.strip()]
+
+# Guaranteed allowed origins for both local development and Netlify deployment
+default_origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "https://jansathi-ai.netlify.app",
+]
+
+origins = list(dict.fromkeys(default_origins + configured_origins))
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
+    allow_origin_regex=r"https://.*\.netlify\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -92,3 +102,8 @@ app.include_router(user_router)
 @app.get("/api/health")
 async def health_check():
     return {"status": "ok", "message": "JanSaathi backend is running"}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=False)
+
