@@ -1,7 +1,7 @@
 import Cookies from "js-cookie";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 
-  (process.env.NODE_ENV === "development" ? "http://localhost:8000" : "https://jansathi-ahwr.onrender.com");
+  (process.env.NODE_ENV === "development" ? "http://localhost:8000" : "https://jansathi-l85y.onrender.com");
 
 async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
   const token = Cookies.get("token");

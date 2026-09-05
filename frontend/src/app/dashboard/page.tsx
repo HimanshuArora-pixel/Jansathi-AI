@@ -99,7 +99,7 @@ export default function Dashboard() {
   const fetchDocuments = async () => {
     try {
       const token = Cookies.get('token');
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV === "development" ? "http://localhost:8000" : "https://jansathi-ahwr.onrender.com");
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV === "development" ? "http://localhost:8000" : "https://jansathi-l85y.onrender.com");
       const res = await fetch(`${API_URL}/api/documents/`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
