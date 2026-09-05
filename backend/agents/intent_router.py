@@ -24,13 +24,14 @@ from langchain_core.messages import HumanMessage
 
 MODEL_DIR = os.path.join(os.path.dirname(__file__), "../models/intent_classifier")
 MODEL_FILE = os.path.join(MODEL_DIR, "model.safetensors")
+ONNX_QUANT_FILE = os.path.join(MODEL_DIR, "model_quantized.onnx")
+ONNX_FILE = os.path.join(MODEL_DIR, "model.onnx")
 MAPPING_FILE = os.path.join(MODEL_DIR, "label_mapping.json")
+TOKENIZER_FILE = os.path.join(MODEL_DIR, "tokenizer.json")
 
 # ---------------------------------------------------------------------------
 # Environment detection
 # ---------------------------------------------------------------------------
-# Render.com sets RENDER=true automatically. We also check that the model file
-# is real (> 1 MB) to guard against Git LFS pointer stubs.
 _is_render = os.getenv("RENDER", "").lower() in ("true", "1", "yes")
 _model_file_ok = (
     os.path.exists(MODEL_FILE) and os.path.getsize(MODEL_FILE) > 1_000_000
@@ -38,7 +39,7 @@ _model_file_ok = (
 _use_local_model = (not _is_render) and _model_file_ok
 
 # ---------------------------------------------------------------------------
-# 1. Load local fine-tuned model (only when appropriate)
+# 1. Load fine-tuned model (ONNX preferred for low RAM & high speed)
 # ---------------------------------------------------------------------------
 DEFAULT_LABEL_MAPPING = {
     0: "Cheque_Bounce",
@@ -53,11 +54,13 @@ DEFAULT_LABEL_MAPPING = {
     9: "Workplace_Labour",
 }
 
+onnx_session = None
+onnx_tokenizer = None
 local_model = None
 local_tokenizer = None
 label_mapping: dict[int, str] = DEFAULT_LABEL_MAPPING.copy()
 
-# Always load the label mapping (used by both local model and Hugging Face API)
+# Always load the label mapping
 if os.path.exists(MAPPING_FILE):
     try:
         with open(MAPPING_FILE, "r", encoding="utf-8") as f:
@@ -66,25 +69,63 @@ if os.path.exists(MAPPING_FILE):
     except Exception:
         pass
 
-if _use_local_model:
+# Determine ONNX model path (prioritize quantized INT8: ~105MB, <150MB RAM)
+onnx_model_path = None
+if os.path.exists(ONNX_QUANT_FILE) and os.path.getsize(ONNX_QUANT_FILE) > 10_000_000:
+    onnx_model_path = ONNX_QUANT_FILE
+elif os.path.exists(ONNX_FILE) and os.path.getsize(ONNX_FILE) > 10_000_000:
+    onnx_model_path = ONNX_FILE
+elif _is_render:
+    # On Render, auto-fetch quantized ONNX model from Hugging Face if not bundled
+    try:
+        import urllib.request
+        hf_repo = os.getenv("HF_MODEL_ID", "EverVissionAI/jansaathi-legal-intent").replace("https://huggingface.co/", "").strip("/")
+        hf_url = f"https://huggingface.co/{hf_repo}/resolve/main/model_quantized.onnx"
+        print(f"[IntentRouter] Downloading quantized ONNX model from {hf_url}...")
+        os.makedirs(MODEL_DIR, exist_ok=True)
+        urllib.request.urlretrieve(hf_url, ONNX_QUANT_FILE)
+        if os.path.exists(ONNX_QUANT_FILE) and os.path.getsize(ONNX_QUANT_FILE) > 10_000_000:
+            onnx_model_path = ONNX_QUANT_FILE
+            print("[IntentRouter] Quantized ONNX model downloaded successfully!")
+    except Exception as exc:
+        print(f"[IntentRouter] Could not download ONNX model on Render: {exc}")
+
+if onnx_model_path and os.path.exists(TOKENIZER_FILE):
+    try:
+        import onnxruntime as ort
+        from tokenizers import Tokenizer
+
+        opts = ort.SessionOptions()
+        opts.inter_op_num_threads = 1
+        opts.intra_op_num_threads = 1
+        onnx_session = ort.InferenceSession(onnx_model_path, sess_options=opts, providers=["CPUExecutionProvider"])
+        onnx_tokenizer = Tokenizer.from_file(TOKENIZER_FILE)
+        print(f"[IntentRouter] ONNX model active ({os.path.basename(onnx_model_path)}). RAM < 150MB. Classes: {list(label_mapping.values())}")
+    except Exception as exc:
+        print(f"[IntentRouter] Failed to load ONNX model: {exc}")
+        onnx_session = None
+        onnx_tokenizer = None
+
+# PyTorch fallback if ONNX not present and running locally
+if onnx_session is None and _use_local_model:
     try:
         import torch  # noqa: imported conditionally to avoid OOM on Render
         from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
-        print("[IntentRouter] Local environment detected. Loading fine-tuned model...")
+        print("[IntentRouter] Local environment detected. Loading PyTorch model...")
         local_tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR)
         local_model = AutoModelForSequenceClassification.from_pretrained(MODEL_DIR)
         local_model.eval()
-        print(f"[IntentRouter] Local model loaded. Classes: {list(label_mapping.values())}")
+        print(f"[IntentRouter] PyTorch model loaded. Classes: {list(label_mapping.values())}")
     except Exception as exc:
-        print(f"[IntentRouter] Failed to load local model: {exc}. Falling back to Hugging Face / Groq.")
+        print(f"[IntentRouter] Failed to load PyTorch model: {exc}. Falling back to Hugging Face / Groq.")
         local_model = None
         local_tokenizer = None
-else:
+elif onnx_session is None:
     if _is_render:
-        print("[IntentRouter] Render environment detected. Skipping local model — using Hugging Face / Groq.")
+        print("[IntentRouter] Render environment: ONNX not yet ready. Using Hugging Face / Groq fallback.")
     else:
-        print("[IntentRouter] Local model not found or cloud mode active. Using Hugging Face / Groq fallback.")
+        print("[IntentRouter] Local model not found. Using Hugging Face / Groq fallback.")
 
 # ---------------------------------------------------------------------------
 # 2. Groq LLM fallback (always initialised)
@@ -455,7 +496,36 @@ def intent_router_node(state: AgentState) -> dict:
     if intent:
         print(f"[IntentRouter] Keyword override -> {intent}")
 
-    # ── Local model inference (local environment only) ───────────────────────
+    # ── ONNX model inference (Render & Local, ultra-fast & low memory) ─────────
+    if intent is None and onnx_session is not None and onnx_tokenizer is not None:
+        try:
+            import numpy as np
+            enc = onnx_tokenizer.encode(latest_message)
+            input_ids = np.array([enc.ids], dtype=np.int64)
+            attention_mask = np.array([enc.attention_mask], dtype=np.int64)
+            ort_outs = onnx_session.run(None, {"input_ids": input_ids, "attention_mask": attention_mask})
+            logits = ort_outs[0]
+            exp_logits = np.exp(logits - np.max(logits, axis=-1, keepdims=True))
+            probs = exp_logits / np.sum(exp_logits, axis=-1, keepdims=True)
+            pred_id = int(np.argmax(probs, axis=-1)[0])
+            confidence = float(probs[0][pred_id])
+
+            if confidence > 0.40:
+                intent = label_mapping.get(pred_id)
+                print(
+                    f"[IntentRouter] ONNX model -> {intent} "
+                    f"(confidence={confidence:.2f})"
+                )
+            else:
+                print(
+                    f"[IntentRouter] ONNX model uncertain "
+                    f"(confidence={confidence:.2f}) -> Groq fallback."
+                )
+        except Exception as exc:
+            print(f"[IntentRouter] ONNX inference error: {exc} -> Groq fallback.")
+            intent = None
+
+    # ── PyTorch model inference (local environment only) ───────────────────────
     if intent is None and local_model is not None:
         try:
             import torch

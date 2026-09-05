@@ -64,3 +64,5 @@ frontend/CLAUDE.md
 backend/models/**/*.safetensors
 backend/models/**/*.bin
 backend/models/**/*.pt
+backend/models/**/*.onnx
+scratch/

@@ -30,8 +30,8 @@ if ($modelIsMissing) {
     # Recheck after LFS pull
     $fileInfo = Get-Item $modelFile -ErrorAction SilentlyContinue
     if (-not $fileInfo -or $fileInfo.Length -lt 1MB) {
-        Write-Host "Git LFS failed (likely because you downloaded the ZIP). Downloading model directly..." -ForegroundColor Cyan
-        $url = "https://media.githubusercontent.com/media/Manas8112/Jansathi/main/backend/models/intent_classifier/model.safetensors"
+        Write-Host "Git LFS failed (likely because you downloaded the ZIP). Downloading model directly from Hugging Face..." -ForegroundColor Cyan
+        $url = "https://huggingface.co/EverVissionAI/jansaathi-legal-intent/resolve/main/model.safetensors"
 
         if (-not (Test-Path "$baseDir\backend\models\intent_classifier")) {
             New-Item -ItemType Directory -Force -Path "$baseDir\backend\models\intent_classifier" | Out-Null

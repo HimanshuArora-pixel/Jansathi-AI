@@ -30,3 +30,4 @@ aiosqlite
 scikit-learn
 safetensors
 python-docx
+onnxruntime
