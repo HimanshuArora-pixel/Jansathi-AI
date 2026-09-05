@@ -69,28 +69,8 @@ if os.path.exists(MAPPING_FILE):
     except Exception:
         pass
 
-# Determine ONNX model path (prioritize quantized INT8: ~105MB, <150MB RAM)
-onnx_model_path = None
-if os.path.exists(ONNX_QUANT_FILE) and os.path.getsize(ONNX_QUANT_FILE) > 10_000_000:
-    onnx_model_path = ONNX_QUANT_FILE
-elif os.path.exists(ONNX_FILE) and os.path.getsize(ONNX_FILE) > 10_000_000:
-    onnx_model_path = ONNX_FILE
-elif _is_render:
-    # On Render, auto-fetch quantized ONNX model from Hugging Face if not bundled
-    try:
-        import urllib.request
-        hf_repo = os.getenv("HF_MODEL_ID", "EverVissionAI/jansaathi-legal-intent").replace("https://huggingface.co/", "").strip("/")
-        hf_url = f"https://huggingface.co/{hf_repo}/resolve/main/model_quantized.onnx"
-        print(f"[IntentRouter] Downloading quantized ONNX model from {hf_url}...")
-        os.makedirs(MODEL_DIR, exist_ok=True)
-        urllib.request.urlretrieve(hf_url, ONNX_QUANT_FILE)
-        if os.path.exists(ONNX_QUANT_FILE) and os.path.getsize(ONNX_QUANT_FILE) > 10_000_000:
-            onnx_model_path = ONNX_QUANT_FILE
-            print("[IntentRouter] Quantized ONNX model downloaded successfully!")
-    except Exception as exc:
-        print(f"[IntentRouter] Could not download ONNX model on Render: {exc}")
-
-if onnx_model_path and os.path.exists(TOKENIZER_FILE):
+def _init_onnx(model_path: str):
+    global onnx_session, onnx_tokenizer
     try:
         import onnxruntime as ort
         from tokenizers import Tokenizer
@@ -98,13 +78,44 @@ if onnx_model_path and os.path.exists(TOKENIZER_FILE):
         opts = ort.SessionOptions()
         opts.inter_op_num_threads = 1
         opts.intra_op_num_threads = 1
-        onnx_session = ort.InferenceSession(onnx_model_path, sess_options=opts, providers=["CPUExecutionProvider"])
+        onnx_session = ort.InferenceSession(model_path, sess_options=opts, providers=["CPUExecutionProvider"])
         onnx_tokenizer = Tokenizer.from_file(TOKENIZER_FILE)
-        print(f"[IntentRouter] ONNX model active ({os.path.basename(onnx_model_path)}). RAM < 150MB. Classes: {list(label_mapping.values())}")
+        print(f"[IntentRouter] ONNX model active ({os.path.basename(model_path)}). RAM < 150MB. Classes: {list(label_mapping.values())}")
     except Exception as exc:
         print(f"[IntentRouter] Failed to load ONNX model: {exc}")
         onnx_session = None
         onnx_tokenizer = None
+
+def _bg_download_and_init():
+    try:
+        import urllib.request
+        hf_repo = os.getenv("HF_MODEL_ID", "EverVissionAI/jansaathi-legal-intent").replace("https://huggingface.co/", "").strip("/")
+        hf_url = f"https://huggingface.co/{hf_repo}/resolve/main/model_quantized.onnx"
+        print(f"[IntentRouter] Background downloading ONNX model from {hf_url}...")
+        os.makedirs(MODEL_DIR, exist_ok=True)
+        tmp_file = ONNX_QUANT_FILE + ".tmp"
+        urllib.request.urlretrieve(hf_url, tmp_file)
+        if os.path.exists(tmp_file) and os.path.getsize(tmp_file) > 10_000_000:
+            os.replace(tmp_file, ONNX_QUANT_FILE)
+            print("[IntentRouter] ONNX model downloaded successfully! Initializing session...")
+            _init_onnx(ONNX_QUANT_FILE)
+    except Exception as exc:
+        print(f"[IntentRouter] Could not download ONNX model on Render: {exc}")
+
+# Check if ONNX model is already on disk (pre-downloaded during build or local)
+onnx_model_path = None
+if os.path.exists(ONNX_QUANT_FILE) and os.path.getsize(ONNX_QUANT_FILE) > 10_000_000:
+    onnx_model_path = ONNX_QUANT_FILE
+elif os.path.exists(ONNX_FILE) and os.path.getsize(ONNX_FILE) > 10_000_000:
+    onnx_model_path = ONNX_FILE
+
+if onnx_model_path and os.path.exists(TOKENIZER_FILE):
+    _init_onnx(onnx_model_path)
+elif _is_render:
+    # On Render, if not pre-downloaded, start non-blocking background fetch so server binds port immediately!
+    import threading
+    print("[IntentRouter] Render environment: ONNX model fetching in background. Using Groq until ready...")
+    threading.Thread(target=_bg_download_and_init, daemon=True).start()
 
 # PyTorch fallback if ONNX not present and running locally
 if onnx_session is None and _use_local_model:
@@ -123,7 +134,7 @@ if onnx_session is None and _use_local_model:
         local_tokenizer = None
 elif onnx_session is None:
     if _is_render:
-        print("[IntentRouter] Render environment: ONNX not yet ready. Using Hugging Face / Groq fallback.")
+        print("[IntentRouter] Render environment: starting with Groq fallback while ONNX loads.")
     else:
         print("[IntentRouter] Local model not found. Using Hugging Face / Groq fallback.")
 
